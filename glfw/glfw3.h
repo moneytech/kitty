@@ -405,6 +405,7 @@ extern "C" {
 #define GLFW_KEY_LEFT_BRACKET       91  /* [ */
 #define GLFW_KEY_BACKSLASH          92  /* \ */
 #define GLFW_KEY_RIGHT_BRACKET      93  /* ] */
+#define GLFW_KEY_CIRCUMFLEX         94  /* ^ */
 #define GLFW_KEY_UNDERSCORE         95  /* _ */
 #define GLFW_KEY_GRAVE_ACCENT       96  /* ` */
 #define GLFW_KEY_WORLD_1            161 /* non-US #1 */
@@ -1592,19 +1593,22 @@ typedef void (* GLFWscrollfun)(GLFWwindow*,double,double,int);
  */
 typedef void (* GLFWkeyboardfun)(GLFWwindow*, GLFWkeyevent*);
 
-/*! @brief The function pointer type for path drop callbacks.
+/*! @brief The function pointer type for drag and drop callbacks.
  *
- *  This is the function pointer type for path drop callbacks.  A path drop
+ *  This is the function pointer type for drop callbacks. A drop
  *  callback function has the following signature:
  *  @code
- *  void function_name(GLFWwindow* window, int path_count, const char* paths[])
+ *  int function_name(GLFWwindow* window, const char* mime, const char* text)
  *  @endcode
  *
  *  @param[in] window The window that received the event.
- *  @param[in] path_count The number of dropped paths.
- *  @param[in] paths The UTF-8 encoded file and/or directory path names.
+ *  @param[in] mime The UTF-8 encoded drop mime-type
+ *  @param[in] data The dropped data or NULL for drag enter events
+ *  @param[in] sz The size of the dropped data
+ *  @return For drag events should return the priority for the specified mime type. A priority of zero
+ *  or lower means the mime type is not accepted. Highest priority will be the finally accepted mime-type.
  *
- *  @pointer_lifetime The path array and its strings are valid until the
+ *  @pointer_lifetime The text is valid until the
  *  callback function returns.
  *
  *  @sa @ref path_drop
@@ -1614,7 +1618,7 @@ typedef void (* GLFWkeyboardfun)(GLFWwindow*, GLFWkeyevent*);
  *
  *  @ingroup input
  */
-typedef void (* GLFWdropfun)(GLFWwindow*,int,const char*[]);
+typedef int (* GLFWdropfun)(GLFWwindow*, const char *, const char*, size_t);
 
 typedef void (* GLFWliveresizefun)(GLFWwindow*, bool);
 
@@ -3035,6 +3039,46 @@ GLFWAPI void glfwSetWindowSizeLimits(GLFWwindow* window, int minwidth, int minhe
  *
  *  @ingroup window
  */
+
+GLFWAPI void glfwSetWindowSizeIncrements(GLFWwindow* window, int widthincr, int heightincr);
+
+/*! @brief Sets the size increments of the specified window.
+ *
+ *  This function sets the size increments of the content area of the specified
+ *  window.  If the window is full screen, the size limits only take effect
+ *  once it is made windowed.  If the window is not resizable, this function
+ *  does nothing.
+ *
+ *  The size increments are applied immediately to a windowed mode window and
+ *  may cause it to be resized.
+ *
+ *  The dimension increments must be greater than zero.
+ *
+ *  @param[in] window The window to set limits for.
+ *  @param[in] widthincr The width increments, in screen coordinates, of the
+ *  content area, or `GLFW_DONT_CARE`.
+ *  @param[in] heightincr The height increments, in screen coordinates, of the
+ *  content area, or `GLFW_DONT_CARE`.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED, @ref
+ *  GLFW_INVALID_VALUE and @ref GLFW_PLATFORM_ERROR.
+ *
+ *  @remark If you set size limits and an aspect ratio that conflict, the
+ *  results are undefined.
+ *
+ *  @remark @wayland The size limits will not be applied until the window is
+ *  actually resized, either by the user or by the compositor.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @sa @ref window_sizelimits
+ *  @sa @ref glfwSetWindowSizeLimits
+ *
+ *  @since Added in version 3.2.
+ *
+ *  @ingroup window
+ */
+
 GLFWAPI void glfwSetWindowAspectRatio(GLFWwindow* window, int numer, int denom);
 
 /*! @brief Sets the size of the content area of the specified window.
@@ -4148,6 +4192,7 @@ GLFWAPI void glfwSetInputMode(GLFWwindow* window, int mode, int value);
  *  - `GLFW_KEY_LEFT_BRACKET`
  *  - `GLFW_KEY_BACKSLASH`
  *  - `GLFW_KEY_RIGHT_BRACKET`
+ *  - `GLFW_KEY_CIRCUMFLEX`
  *  - `GLFW_KEY_UNDERSCORE`
  *  - `GLFW_KEY_GRAVE_ACCENT`
  *  - `GLFW_KEY_WORLD_1`
@@ -5524,8 +5569,9 @@ GLFWAPI int glfwVulkanSupported(void);
  *  returned array, as it is an error to specify an extension more than once in
  *  the `VkInstanceCreateInfo` struct.
  *
- *  @remark @macos This function currently only supports the
- *  `VK_MVK_macos_surface` extension from MoltenVK.
+ *  @remark @macos This function currently supports either the
+ *  `VK_MVK_macos_surface` extension from MoltenVK or `VK_EXT_metal_surface`
+ *  extension.
  *
  *  @pointer_lifetime The returned array is allocated and freed by GLFW.  You
  *  should not free it yourself.  It is guaranteed to be valid only until the
